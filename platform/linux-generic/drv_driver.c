@@ -34,6 +34,19 @@ typedef struct _odpdrv_enumr_class_lst_t {
 } _odpdrv_enumr_class_lst_t;
 static struct _odpdrv_enumr_class_lst_t enumr_class_lst;
 
+/* an enumerator (list element) */
+typedef struct _odpdrv_enumr_t {
+	odpdrv_enumr_param_t param;
+	struct _odpdrv_enumr_t *next;
+} _odpdrv_enumr_t;
+
+/* the enumerator list: */
+typedef struct _odpdrv_enumr_lst_t {
+	odp_spinlock_t lock;
+	_odpdrv_enumr_t *head;
+} _odpdrv_enumr_lst_t;
+static struct _odpdrv_enumr_lst_t enumr_lst;
+
 odpdrv_enumr_class_t odpdrv_enumr_class_register(odpdrv_enumr_class_param_t
 						 *param)
 {
@@ -85,10 +98,37 @@ odpdrv_enumr_class_t odpdrv_enumr_class_register(odpdrv_enumr_class_param_t
 
 odpdrv_enumr_t odpdrv_enumr_register(odpdrv_enumr_param_t *param)
 {
-	ODP_ERR("NOT Supported yet! Enumerator API %s Registration!\n.",
-		param->api_name);
+	_odpdrv_enumr_t *enumr;
 
-	return ODPDRV_ENUMR_INVALID;
+	/* allocate memory for the new enumerator:
+	 * If init_global has not been done yet, we have a big issue,
+	 * as none of the enumerator classes should be porbed before that!
+	 * We cannot even issue an error as ODP_* functions have not been
+	 * initialised yet, but this is no good...
+	 */
+
+	if (!init_global_done) {
+		return ODPDRV_ENUMR_INVALID;
+	} else {
+		enumr = _odp_ishm_pool_alloc(list_elt_pool,
+					     sizeof(_odpdrv_enumr_t));
+		if (!enumr) {
+			ODP_ERR("_odp_ishm_pool_alloc failed!\n");
+			return ODPDRV_ENUMR_INVALID;
+		}
+	}
+
+	/* save init parameters and insert enumerator in list */
+	enumr->param = *param;
+	odp_spinlock_lock(&enumr_lst.lock);
+	enumr->next = enumr_lst.head;
+	enumr_lst.head = enumr;
+	odp_spinlock_unlock(&enumr_lst.lock);
+
+	/* probe the new enumerator: */
+	enumr->param.probe();
+
+	return (odpdrv_enumr_t)enumr;
 }
 
 odpdrv_device_t odpdrv_device_create(odpdrv_device_param_t *param)
@@ -123,6 +163,7 @@ odpdrv_driver_t odpdrv_driver_register(odpdrv_driver_param_t *param)
 int odpdrv_print_all(void)
 {
 	_odpdrv_enumr_class_t *enumr_c;
+	_odpdrv_enumr_t *enumr;
 
 	/* we cannot use ODP_DBG before ODP init... */
 	if (!init_global_done)
@@ -139,6 +180,22 @@ int odpdrv_print_all(void)
 		enumr_c = enumr_c->next;
 	}
 	odp_spinlock_unlock(&enumr_class_lst.lock);
+
+	/* print the list of registered enumerators: */
+	odp_spinlock_lock(&enumr_lst.lock);
+	enumr = enumr_lst.head;
+	ODP_DBG("The following enumerators have been registered:\n");
+	while (enumr) {
+		enumr_c = (_odpdrv_enumr_class_t *)
+					      (void *)enumr->param.enumr_class;
+		ODP_DBG(" enumerator: class: %s, API: %s, Version: %d\n",
+			enumr_c->param.name,
+			enumr->param.api_name,
+			enumr->param.api_version);
+		enumr = enumr->next;
+	}
+	odp_spinlock_unlock(&enumr_lst.lock);
+
 	return 0;
 }
 
@@ -154,8 +211,9 @@ int _odpdrv_driver_init_global(void)
 	 * are made from the list_elt_pool: */
 	init_global_done = 1;
 
-	/* from now, we want to ensure mutex on the list: init lock: */
+	/* from now, we want to ensure mutex on the lists: init lock: */
 	odp_spinlock_init(&enumr_class_lst.lock);
+	odp_spinlock_init(&enumr_lst.lock);
 
 	/* probe all registered enumerator classes registered so far:
 	 * (yes: those being staticaly linked have already registered)*/
@@ -171,9 +229,20 @@ int _odpdrv_driver_init_global(void)
 int _odpdrv_driver_term_global(void)
 {
 	_odpdrv_enumr_class_t *enumr_c;
+	_odpdrv_enumr_t *enumr;
 
 	if (!init_global_done)
 		return 0;
+
+	/* remove all enumerators which are registered: */
+	odp_spinlock_lock(&enumr_lst.lock);
+	while (enumr_lst.head) {
+		enumr = enumr_lst.head;
+		enumr->param.remove();
+		enumr_lst.head = enumr->next;
+		_odp_ishm_pool_free(list_elt_pool, enumr);
+	}
+	odp_spinlock_unlock(&enumr_lst.lock);
 
 	/* remove all enumerator classes which are registered: */
 	odp_spinlock_lock(&enumr_class_lst.lock);
@@ -186,8 +255,8 @@ int _odpdrv_driver_term_global(void)
 		else
 			free(enumr_c);
 	}
-	odp_spinlock_unlock(&enumr_class_lst.lock);
 
+	odp_spinlock_unlock(&enumr_class_lst.lock);
 	/* destroy the list element pool: */
 	_odp_ishm_pool_destroy(list_elt_pool);
 
