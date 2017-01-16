@@ -11,6 +11,7 @@
 
 /* test functions: */
 void drvdriver_test_enumr_class_register(void);
+void drvdriver_test_enumr_register(void);
 
 /* test arrays: */
 extern odp_testinfo_t drvdriver_suite[];
