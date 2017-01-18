@@ -11,7 +11,7 @@ env:
   global:
     # COVERITY_SCAN_TOKEN
     # ** specific to your project **
-    - secure: "xxxx"
+    - secure: "rCtRCqiu62AjLuM3ilt91LbRSJs7ScKpjB/cvX3PPlZLr2yPSQ7tsWQx4v5t7Nrvz/taO6TVLI4fcvHzy8xCg7D2DMXZ2ML6sFy/QoHehRM+Tnn/N+wVhvRapu30bv90a3ChYyvywJbXmm6vZhr3EBPkmrKL16s7tW+3e2FAAU1ZCd08HhR3wYkBvwfVkgzFNVcJ7PtIQMQZt2289yLx2AQbkxZI312ePZqgnJJEFC07eAt5iWN9yjl0gOddAT/UPGDeATU9uQd2wJuAItCGQfAKkxa1yQ3jycE5ZCelTBFq+t4OXMCQ6hD3P81XzbzdIfGcRHBpSzoJydxY7poUJwlkdZ6eNKQW9I1LBhUqxsAMFMTFsQ/iPiihcwptWiZK7NgqBYBJhj7FSblvO0F+Hs2Qa4qtMrNZDJneVs6gHFaFjgy5T4f2JedyQcMOz3WrBqGLvEP4vQW2tsIZ1N9AjDfzO9SwO7b3HfZj9hxgrZ/kHQ7xS1gMBJgAx7KTV2YQKiNflM2ErlEi97KDZGBSu4Bl+APJvZpIPQMQ/V3FuIjYin0h5maJnyjDFPfITocFqPp2z6kQSw17WtuFDwqIasdrLStj4Xo7Awe5dc3k7DHCwyA70z5hobudTahyZwXm6IU/zHvkzvNOB5/fWaMbQDEpXXtQgrbY2VIPZAPB1xY="
 
 language: c
 compiler: clang
